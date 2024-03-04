@@ -16,7 +16,6 @@ class NotionManager:
         except Exception as e:
             raise (f"Error al obtener el nombre de la tarea con ID {task_id}: {e}")
 
-
     def create_item(self, database_id, properties):
         try:
             new_item = self.notion.pages.create(parent={"database_id": database_id}, properties=properties)
@@ -94,8 +93,8 @@ class App:
 
 if __name__ == "__main__":
     app = App()
-    task_id = "c02d9be6-0237-46fe-a234-46865e61ac2d"
-    print(app.notion_manager.get_task_name_by_id(task_id))
+    var = app.notion_manager.query_database(os.getenv("SUB_ITINERARY"))
+    print(var[0])
 
     
 
