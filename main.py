@@ -16,6 +16,13 @@ class NotionManager:
         self.notion = Client(auth=self.notion_token)
         self.data_converter = DataConverter()
 
+    def get_task_name_by_id(self, task_id: str):
+        try:
+            task = self.read_item_by_id(os.getenv("TASK"), task_id)
+            task_name = task.get("properties", {}).get("name", {}).get("title", [{}])[0].get("plain_text", "")
+            return task_name
+        except Exception as e:
+            raise HTTPException
 
     def query_database(self, database_id):
         try:
@@ -80,7 +87,7 @@ def get_subcontractors():
     formatted_data = notion_manager.convert_to_json(subcontractors)
     return formatted_data
 
-@app.get("/subcontractors/{subcontractor_id}/items/", response_model=List[Dict[str, Union[str, int]]])
+@app.get("/subcontractors/{subcontractor_id}/items/", response_model=List[Dict[str, Union[str, int, None]]])
 def get_items_by_subcontractor(subcontractor_id: str):
     items = notion_manager.query_database(sub_itinerary_db)
     subcontractor_items = []
@@ -102,12 +109,19 @@ def get_items_by_subcontractor(subcontractor_id: str):
                 task_relation = item.get("properties", {}).get("task", {}).get("relation", [])
                 if task_relation:
                     task_id = task_relation[0].get("id", "")
+                    task_name = notion_manager.get_task_name_by_id(task_id)
+
+                # Obtiene la fecha
+                date_info = item.get("properties", {}).get("date", {}).get("date")
+                date_value = None
+                if date_info:
+                    date_value = date_info.get("start", "")
 
                 # Manejo de errores para propiedades vacías
                 if not (code_num and status_name and task_id):
                     raise HTTPException(status_code=404, detail="Propiedad vacía en el item")
 
-                subcontractor_items.append({"id": item["id"], "code_num": code_num, "status": status_name, "task_id": task_id})
+                subcontractor_items.append({"id": item["id"], "code_num": code_num, "status": status_name, "task_id": task_id, "task_name": task_name, "date": date_value})
                 break
     return subcontractor_items
 
