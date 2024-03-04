@@ -48,12 +48,21 @@ class NotionManager:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error al leer el item con ID {item_id}: {e}")
 
-    def update_item_status(self, database_id, item_id, new_status):
+    def update_item(self, item_id, properties):
         try:
-            updated_item = self.notion.pages.update(page_id=item_id, properties={"Status": {"select": {"name": new_status}}})
+            updated_item = self.notion.pages.update(page_id=item_id, properties=properties)
             return updated_item
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error al actualizar el item con ID {item_id}: {e}")
+            print(f"Error al actualizar el item con ID {item_id}: {e}")
+            return None
+
+    def create_item(self, database_id, properties):
+        try:
+            new_item = self.notion.pages.create(parent={"database_id": database_id}, properties=properties)
+            return new_item
+        except Exception as e:
+            print(f"Error al crear el item: {e}")
+            return None
 
     def convert_to_json(self, items):
         return self.data_converter.convert_to_json(items)
@@ -125,4 +134,40 @@ def get_items_by_subcontractor(subcontractor_id: str):
                 break
     return subcontractor_items
 
+@app.put("/itinerary/{item_id}/{status}/")
+def update_itinerary_item_status(item_id: str, status: str):
+    # Llamamos a la función para actualizar el item en el itinerario
+    properties = {'status': {'multi_select': [{'name': status}]}}
+    updated_item = notion_manager.update_item(item_id, properties)
+    
+    # Verificamos si la actualización fue exitosa
+    if updated_item:
+        return {"message": f"Estado del item con ID {item_id} actualizado correctamente a '{status}'"}
+    else:
+        raise HTTPException(status_code=500, detail=f"No se pudo actualizar el estado del item con ID {item_id}")
 
+@app.post("/sub-itinerary/{subcontractor_id}/{task_id}/{status}/")
+def create_sub_itinerary_item(subcontractor_id: str, task_id: str, status: str):
+    try:
+        properties = {
+            "task": {
+                "relation": [{"id": task_id}]
+            },
+            "status": {
+                "multi_select": [{"name": status}]
+            },
+            "subcontractor": {
+                "relation": [{"id": subcontractor_id}]
+            }
+        }
+
+        
+        # Llama a la función para crear el nuevo item en la base de datos "sub itinerary"
+        new_item = notion_manager.create_item(database_id=os.getenv("SUB_ITINERARY"), properties=properties)
+        
+        if new_item:
+            return {"message": "Nuevo elemento creado en sub-itinerary"}
+        else:
+            raise HTTPException(status_code=500, detail="No se pudo crear el nuevo elemento en sub-itinerary")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al crear el nuevo elemento en sub-itinerary: {e}")
